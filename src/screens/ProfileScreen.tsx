@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import { XpService } from '../services/xpService';
 
 type Profile = {
   id: string;
@@ -43,6 +44,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [battleStats, setBattleStats] = useState<BattleStats>({ wins: 0, losses: 0, challenges: 0 });
+  const [previousLevel, setPreviousLevel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -85,8 +87,33 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || '');
+      
+      // Check for level-up and show toast
+      const currentLevel = profile.level || 'Challenger';
+      if (previousLevel && previousLevel !== currentLevel) {
+        // Level changed - show rank-up toast
+        const nextRankMessage = getNextRankMessage(currentLevel);
+        Alert.alert(
+          'Rank Up!',
+          `You're now a ${currentLevel}! ${nextRankMessage}`,
+          [{ text: 'Awesome!', style: 'default' }]
+        );
+      }
+      setPreviousLevel(currentLevel);
     }
   }, [profile]);
+
+  // Helper to get motivational message for next rank
+  const getNextRankMessage = (rank: string) => {
+    switch (rank) {
+      case 'Contender': return 'Keep stacking verified challenges to reach Rival.';
+      case 'Rival': return 'You\'re climbing! Warrior status awaits at 1,500 XP.';
+      case 'Warrior': return 'Battle on! Champion is within reach at 5,000 XP.';
+      case 'Champion': return 'Elite status! Legend awaits at 15,000 XP.';
+      case 'Legend': return 'You\'ve reached the pinnacle. You are a Legend!';
+      default: return 'Keep battling to rank up!';
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -161,16 +188,28 @@ export default function ProfileScreen({ navigation }: any) {
     .substring(0, 2)
     .toUpperCase();
 
-  const getLevelInfo = (xp: number) => {
-    if (xp >= 3000) return { level: 'Legend', nextLevel: 'Legend', progress: 100, nextXp: 3000 };
-    if (xp >= 2000) return { level: 'Champion', nextLevel: 'Legend', progress: ((xp - 2000) / 1000) * 100, nextXp: 3000 };
-    if (xp >= 1000) return { level: 'Veteran', nextLevel: 'Champion', progress: ((xp - 1000) / 1000) * 100, nextXp: 2000 };
-    if (xp >= 500) return { level: 'Challenger', nextLevel: 'Veteran', progress: ((xp - 500) / 500) * 100, nextXp: 1000 };
-    return { level: 'Rookie', nextLevel: 'Challenger', progress: (xp / 500) * 100, nextXp: 500 };
+  // Use XpService for consistent rank calculation across the app
+  const rankInfo = XpService.getRankInfo(xpValue);
+  
+  // Map rank to level number for display
+  const getLevelNumber = (rank: string) => {
+    switch (rank) {
+      case 'Legend': return 50;
+      case 'Champion': return 40;
+      case 'Warrior': return 30;
+      case 'Rival': return 20;
+      case 'Contender': return 10;
+      default: return 1;
+    }
   };
 
-  const levelInfo = getLevelInfo(xpValue);
-  const levelNumber = xpValue >= 3000 ? 15 : xpValue >= 2000 ? 12 : xpValue >= 1000 ? 8 : xpValue >= 500 ? 4 : 1;
+  const levelInfo = {
+    level: rankInfo.currentRank,
+    nextLevel: rankInfo.nextRank,
+    progress: rankInfo.progress,
+    nextXp: rankInfo.nextThreshold,
+  };
+  const levelNumber = getLevelNumber(rankInfo.currentRank);
 
   if (loading) {
     return (

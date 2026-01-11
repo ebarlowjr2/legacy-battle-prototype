@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { getResultByEventId } from './sportsApi';
+import { XpService } from './xpService';
 
 export type Battle = {
   id: string;
@@ -69,6 +70,13 @@ export const BattleService = {
         console.error('Error inserting creator participant:', participantError);
       }
     }
+
+    // Award XP for creating a battle (+25 XP)
+    XpService.awardXp({
+      eventType: 'create_challenge',
+      sourceType: 'battle',
+      sourceId: battle.id,
+    }).catch(err => console.error('Error awarding create XP:', err));
 
     return { data: battle, error };
   },
@@ -174,10 +182,17 @@ export const BattleService = {
         .eq('id', battleId);
     }
 
+    // Award XP for joining/accepting a battle (+25 XP)
+    XpService.awardXp({
+      eventType: 'accept_challenge',
+      sourceType: 'battle',
+      sourceId: battleId,
+    }).catch(err => console.error('Error awarding accept XP:', err));
+
     return { data, error };
   },
 
-  subscribeToParticipants: (battleId: string, callback: (payload: any) => void) => {
+  subscribeToParticipants:(battleId: string, callback: (payload: any) => void) => {
     return supabase
       .channel(`battle_participants:${battleId}`)
       .on(
@@ -242,6 +257,28 @@ export const BattleService = {
       })
       .eq('id', battleId);
 
+    // Award XP for verified resolution (+100 XP) to all participants
+    // Each participant gets XP for completing a verified battle
+    for (const participant of participants) {
+      XpService.awardXp({
+        eventType: 'verified_resolution',
+        sourceType: 'battle',
+        sourceId: `${battleId}:${participant.user_id}`,
+      }).catch(err => console.error('Error awarding resolution XP:', err));
+    }
+
     return { error: updateError, winnerId };
+  },
+
+  /**
+   * Award XP for sharing a battle result
+   * Call this when user shares a battle card/result
+   */
+  awardShareXp: async (battleId: string, userId: string) => {
+    return XpService.awardXp({
+      eventType: 'share_result',
+      sourceType: 'share',
+      sourceId: `${battleId}:${userId}`,
+    });
   },
 };
