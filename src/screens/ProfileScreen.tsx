@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,14 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import { getRankInfo, XpService } from '../services/xpService';
 
 type Profile = {
   id: string;
@@ -43,6 +45,10 @@ export default function ProfileScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [battleStats, setBattleStats] = useState<BattleStats>({ wins: 0, losses: 0, challenges: 0 });
+  const [achievementCount, setAchievementCount] = useState(0);
+  const [rankToast, setRankToast] = useState<string | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const previousRankRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -78,13 +84,36 @@ export default function ProfileScreen({ navigation }: any) {
       }
     };
 
+    const loadAchievements = async () => {
+      const { data } = await XpService.getUserAchievements(user.id);
+      if (data) {
+        setAchievementCount(data.length);
+      }
+    };
+
     loadProfile();
     loadBattleStats();
+    loadAchievements();
   }, [user]);
 
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || '');
+
+      const currentRank = profile.level || 'Challenger';
+      if (previousRankRef.current && previousRankRef.current !== currentRank) {
+        const rankInfo = getRankInfo(profile.xp || 0);
+        const toastMsg = rankInfo.isMaxRank
+          ? `You're now a ${currentRank}! You've reached the highest rank!`
+          : `You're now a ${currentRank}! Keep stacking verified challenges to reach ${rankInfo.nextRank}.`;
+        setRankToast(toastMsg);
+        Animated.sequence([
+          Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.delay(4000),
+          Animated.timing(toastOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]).start(() => setRankToast(null));
+      }
+      previousRankRef.current = currentRank;
     }
   }, [profile]);
 
@@ -161,16 +190,7 @@ export default function ProfileScreen({ navigation }: any) {
     .substring(0, 2)
     .toUpperCase();
 
-  const getLevelInfo = (xp: number) => {
-    if (xp >= 3000) return { level: 'Legend', nextLevel: 'Legend', progress: 100, nextXp: 3000 };
-    if (xp >= 2000) return { level: 'Champion', nextLevel: 'Legend', progress: ((xp - 2000) / 1000) * 100, nextXp: 3000 };
-    if (xp >= 1000) return { level: 'Veteran', nextLevel: 'Champion', progress: ((xp - 1000) / 1000) * 100, nextXp: 2000 };
-    if (xp >= 500) return { level: 'Challenger', nextLevel: 'Veteran', progress: ((xp - 500) / 500) * 100, nextXp: 1000 };
-    return { level: 'Rookie', nextLevel: 'Challenger', progress: (xp / 500) * 100, nextXp: 500 };
-  };
-
-  const levelInfo = getLevelInfo(xpValue);
-  const levelNumber = xpValue >= 3000 ? 15 : xpValue >= 2000 ? 12 : xpValue >= 1000 ? 8 : xpValue >= 500 ? 4 : 1;
+  const rankInfo = getRankInfo(xpValue);
 
   if (loading) {
     return (
@@ -211,11 +231,11 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.username}>{profile?.display_name || profile?.username || 'User'}</Text>
           <Text style={styles.email}>{user?.email}</Text>
           
-          {/* Level Badge */}
+          {/* Rank Badge */}
           <View style={styles.levelBadgeContainer}>
             <Text style={styles.trophyIcon}>🏆</Text>
             <Text style={styles.levelBadgeText}>
-              {levelInfo.level} Level {levelNumber}
+              {rankInfo.rank}
             </Text>
             <Text style={styles.levelXpText}>  {xpValue.toLocaleString()} XP</Text>
           </View>
@@ -245,16 +265,20 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.rankCard}>
           <View style={styles.rankHeader}>
             <Text style={styles.rankTitle}>Legacy Rank</Text>
-            <Text style={styles.rankLevel}>{levelInfo.level}</Text>
+            <Text style={styles.rankLevel}>{rankInfo.rank}</Text>
           </View>
           <View style={styles.rankProgressContainer}>
             <View style={styles.rankProgressBar}>
-              <View style={[styles.rankProgress, { width: `${levelInfo.progress}%` }]} />
+              <View style={[styles.rankProgress, { width: `${rankInfo.progress}%` }]} />
             </View>
           </View>
           <View style={styles.rankFooter}>
             <Text style={styles.rankXpText}>{xpValue.toLocaleString()} XP</Text>
-            <Text style={styles.rankNextText}>{levelInfo.nextLevel}: {levelInfo.nextXp.toLocaleString()} XP</Text>
+            <Text style={styles.rankNextText}>
+              {rankInfo.isMaxRank
+                ? 'Max Rank Achieved'
+                : `${xpValue.toLocaleString()} / ${rankInfo.nextRankXp.toLocaleString()} XP to ${rankInfo.nextRank}`}
+            </Text>
           </View>
           
           {/* Battle Invitation */}
@@ -291,7 +315,7 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={styles.menuItemText}>Achievements</Text>
             <View style={styles.menuRight}>
               <View style={styles.menuBadge}>
-                <Text style={styles.menuBadgeText}>12</Text>
+                <Text style={styles.menuBadgeText}>{achievementCount}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
             </View>
@@ -362,6 +386,13 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {rankToast && (
+        <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]}>
+          <Ionicons name="star" size={20} color="#FFD700" />
+          <Text style={styles.toastText}>{rankToast}</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -699,5 +730,29 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: SIZES.font,
     fontWeight: 'bold',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: SIZES.padding,
+    right: SIZES.padding,
+    backgroundColor: COLORS.card,
+    borderRadius: SIZES.radius,
+    padding: SIZES.padding,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.base,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: {
+    color: COLORS.text,
+    fontSize: SIZES.font,
+    flex: 1,
   },
 });

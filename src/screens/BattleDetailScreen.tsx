@@ -17,6 +17,7 @@ import { BattleService, Battle, BattleParticipant } from '../services/battleServ
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { getResultByEventId, SportsEvent } from '../services/sportsApi';
+import { AwardXpResult } from '../services/xpService';
 
 interface BattleDetailScreenProps {
   navigation: any;
@@ -34,6 +35,8 @@ export default function BattleDetailScreen({ navigation, route }: BattleDetailSc
   const [pick, setPick] = useState('');
   const [gameScore, setGameScore] = useState<SportsEvent | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
 
   const loadBattle = async () => {
     if (!battleId) return;
@@ -171,6 +174,22 @@ export default function BattleDetailScreen({ navigation, route }: BattleDetailSc
       Alert.alert('Battle Resolved', 'Winner determined!');
     } else {
       Alert.alert('Battle Resolved', 'No winner (tie or unmatched picks).');
+    }
+  };
+
+  const handleShare = async () => {
+    if (!battleId || sharing) return;
+    setSharing(true);
+    const result: AwardXpResult = await BattleService.shareResult(battleId);
+    setSharing(false);
+    if (result.success) {
+      setShared(true);
+      const msg = result.alreadyAwarded
+        ? 'You already shared this result.'
+        : `+${result.pointsAwarded} XP for sharing!`;
+      Alert.alert('Shared', msg);
+    } else {
+      Alert.alert('Error', result.error || 'Failed to share result');
     }
   };
 
@@ -482,6 +501,23 @@ export default function BattleDetailScreen({ navigation, route }: BattleDetailSc
             <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
             <Text style={styles.joinedText}>You have joined this battle</Text>
           </View>
+        )}
+
+        {battle.status === 'completed' && (isCreator || alreadyJoined) && (
+          <TouchableOpacity
+            style={[styles.shareButton, (sharing || shared) && styles.shareButtonDisabled]}
+            onPress={handleShare}
+            disabled={sharing || shared}
+          >
+            {sharing ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name={shared ? 'checkmark-circle' : 'share-social-outline'} size={20} color={COLORS.white} />
+                <Text style={styles.shareButtonText}>{shared ? 'Shared' : 'Share Result (+10 XP)'}</Text>
+              </>
+            )}
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -893,5 +929,24 @@ const styles = StyleSheet.create({
   },
   yourPredictionTeam: {
     color: '#4CAF50',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3b82f6',
+    paddingVertical: SIZES.padding,
+    borderRadius: SIZES.radius,
+    marginTop: SIZES.padding,
+    marginBottom: SIZES.padding,
+    gap: SIZES.base,
+  },
+  shareButtonDisabled: {
+    opacity: 0.6,
+  },
+  shareButtonText: {
+    color: COLORS.white,
+    fontSize: SIZES.font,
+    fontWeight: 'bold',
   },
 });

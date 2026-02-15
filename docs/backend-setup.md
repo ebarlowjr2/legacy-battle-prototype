@@ -125,8 +125,87 @@ Set in `.env` file (not committed to git):
 | Insert own profile | INSERT | User can only insert their own profile (id = auth.uid()) |
 | Update own profile | UPDATE | User can only update their own profile |
 
+## Phase 1: XP & Achievements System
+
+### New Tables
+
+#### `xp_events` table (XP Ledger)
+Server-authoritative XP tracking. Only writable via service role.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | uuid (PK) | gen_random_uuid() | Event ID |
+| user_id | uuid (FK) | - | References auth.users(id) |
+| event_type | text | - | create_challenge, accept_challenge, verified_resolution, share_result |
+| source_type | text | - | Source entity type (e.g., 'battle') |
+| source_id | text | - | Source entity ID |
+| points | integer | - | XP points awarded |
+| created_at | timestamptz | now() | When XP was awarded |
+
+**Unique constraint**: `(user_id, event_type, source_type, source_id)` - prevents double-awarding.
+
+#### `achievements` table
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | text (PK) | - | Achievement identifier |
+| name | text | - | Display name |
+| description | text | - | Description |
+| icon | text | 'trophy' | Icon name |
+| category | text | 'rank' | Category |
+
+#### `user_achievements` table
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | uuid (PK) | gen_random_uuid() | Record ID |
+| user_id | uuid (FK) | - | References auth.users(id) |
+| achievement_id | text (FK) | - | References achievements(id) |
+| earned_at | timestamptz | now() | When earned |
+
+**Unique constraint**: `(user_id, achievement_id)`
+
+### Rank Thresholds
+| XP Range | Rank |
+|----------|------|
+| 0-99 | Challenger |
+| 100-499 | Contender |
+| 500-1,499 | Rival |
+| 1,500-4,999 | Warrior |
+| 5,000-14,999 | Champion |
+| 15,000+ | Legend |
+
+### XP Rules
+| Event | Points |
+|-------|--------|
+| create_challenge | +25 |
+| accept_challenge | +25 |
+| verified_resolution | +100 |
+| share_result | +10 |
+
+### SQL Functions
+- `rank_from_xp(total_xp)` - Returns rank name from XP
+- `next_rank_target(total_xp)` - Returns XP needed for next rank
+- `recompute_profile_xp(p_user_id)` - Recomputes profile XP from ledger (SECURITY DEFINER)
+
+### Edge Function: `award-xp`
+- **Endpoint**: `POST /functions/v1/award-xp`
+- **Auth**: Bearer token (user JWT)
+- **Body**: `{ eventType, sourceType, sourceId }`
+- **Logic**: Authenticates user, inserts into xp_events via service role, recomputes profile, detects rank changes, inserts achievements
+- **Idempotent**: Unique constraint prevents duplicate awards
+
+### SQL Migrations
+Run in order in Supabase SQL Editor:
+1. `supabase/migrations/001_xp_events.sql`
+2. `supabase/migrations/002_rank_functions.sql`
+3. `supabase/migrations/003_achievements.sql`
+
+### Deploy Edge Function
+```bash
+supabase functions deploy award-xp
+```
+
 ## Next Steps
 
-- Part 2: Implement authentication flow (sign up, login, logout)
-- Part 3: Wire up profile creation on sign up
-- Part 4: Implement battle creation and wallet transactions
+- Phase 2: Battle Buddies
+- Phase 3: Automated Battle Resolution
+- Phase 4: Wallet System

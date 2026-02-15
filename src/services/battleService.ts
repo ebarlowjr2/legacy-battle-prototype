@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { getResultByEventId } from './sportsApi';
+import { XpService, AwardXpResult } from './xpService';
 
 export type Battle = {
   id: string;
@@ -70,10 +71,14 @@ export const BattleService = {
       }
     }
 
+    XpService.awardXp('create_challenge', 'battle', battle.id).catch((e) =>
+      console.warn('XP award (create) failed:', e)
+    );
+
     return { data: battle, error };
   },
 
-  getBattles: async () => {
+  getBattles:async () => {
     return await supabase
       .from('battles')
       .select('*')
@@ -174,10 +179,14 @@ export const BattleService = {
         .eq('id', battleId);
     }
 
+    XpService.awardXp('accept_challenge', 'battle', battleId).catch((e) =>
+      console.warn('XP award (join) failed:', e)
+    );
+
     return { data, error };
   },
 
-  subscribeToParticipants: (battleId: string, callback: (payload: any) => void) => {
+  subscribeToParticipants:(battleId: string, callback: (payload: any) => void) => {
     return supabase
       .channel(`battle_participants:${battleId}`)
       .on(
@@ -242,6 +251,18 @@ export const BattleService = {
       })
       .eq('id', battleId);
 
+    if (!updateError) {
+      for (const participant of participants) {
+        XpService.awardXp('verified_resolution', 'battle', battleId).catch((e) =>
+          console.warn('XP award (resolve) failed:', e)
+        );
+      }
+    }
+
     return { error: updateError, winnerId };
+  },
+
+  shareResult: async (battleId: string): Promise<AwardXpResult> => {
+    return await XpService.awardXp('share_result', 'battle', battleId);
   },
 };
