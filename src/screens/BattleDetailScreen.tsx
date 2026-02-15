@@ -182,11 +182,11 @@ export default function BattleDetailScreen({ navigation, route }: BattleDetailSc
     setSharing(true);
     const result: AwardXpResult = await BattleService.shareResult(battleId);
     setSharing(false);
-    if (result.success) {
+    if (result.ok || result.status === 'already_awarded') {
       setShared(true);
-      const msg = result.alreadyAwarded
+      const msg = result.status === 'already_awarded'
         ? 'You already shared this result.'
-        : `+${result.pointsAwarded} XP for sharing!`;
+        : `+${result.points} XP for sharing!`;
       Alert.alert('Shared', msg);
     } else {
       Alert.alert('Error', result.error || 'Failed to share result');

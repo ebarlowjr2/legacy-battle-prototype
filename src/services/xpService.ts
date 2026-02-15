@@ -3,13 +3,17 @@ import { supabase } from '../lib/supabaseClient';
 export type XpEventType = 'create_challenge' | 'accept_challenge' | 'verified_resolution' | 'share_result';
 
 export type AwardXpResult = {
-  success: boolean;
-  alreadyAwarded: boolean;
-  xp: number;
-  rank: string;
-  previousRank?: string;
-  rankChanged: boolean;
-  pointsAwarded?: number;
+  ok: boolean;
+  status: 'awarded' | 'already_awarded';
+  points?: number;
+  eventType?: string;
+  previousXp?: number;
+  newXp?: number;
+  previousLevel?: string;
+  newLevel?: string;
+  rankUp?: boolean;
+  newAchievement?: string | null;
+  message?: string;
   error?: string;
 };
 
@@ -93,11 +97,8 @@ export const XpService = {
 
       if (!token) {
         return {
-          success: false,
-          alreadyAwarded: false,
-          xp: 0,
-          rank: 'Challenger',
-          rankChanged: false,
+          ok: false,
+          status: 'already_awarded' as const,
           error: 'Not authenticated',
         };
       }
@@ -117,11 +118,8 @@ export const XpService = {
 
       if (!response.ok) {
         return {
-          success: false,
-          alreadyAwarded: false,
-          xp: 0,
-          rank: 'Challenger',
-          rankChanged: false,
+          ok: false,
+          status: 'already_awarded' as const,
           error: result.error || 'Failed to award XP',
         };
       }
@@ -130,11 +128,8 @@ export const XpService = {
     } catch (err: any) {
       console.error('XP award error:', err);
       return {
-        success: false,
-        alreadyAwarded: false,
-        xp: 0,
-        rank: 'Challenger',
-        rankChanged: false,
+        ok: false,
+        status: 'already_awarded' as const,
         error: err.message || 'Network error',
       };
     }
