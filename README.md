@@ -4,6 +4,9 @@
 Legacy Battle is an XP-driven sports battle app where players challenge each other, form crews, and have battles auto-resolved from live sports data. The app is **XP-only engagement for now** (no wallet functionality is implemented in this repo yet). Sports events are normalized into a repository of games, and battles resolve automatically when those events finalize.
 
 ## Architecture Overview
+
+**Full architecture and refactor documentation:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — folder structure, Zustand/TanStack Query/Supabase setup, theme and scaling, navigation, and where to put new code.
+
 This app is a mobile Expo/React Native client backed by Supabase and server-authoritative Edge Functions. Sports data is populated by a separate Lightsail microservice into Supabase `sports_*` tables.
 
 ```

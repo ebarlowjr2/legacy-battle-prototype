@@ -1,13 +1,39 @@
 {
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": [
+      "dom",
+      "esnext"
+    ],
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "target": "esnext",
     "strict": true,
     "baseUrl": ".",
     "paths": {
       "@/app/*": ["src/app/*"],
-      "@/modules/*": ["src/modules/*"],
-      "@/shared/*": ["src/shared/*"]
+      "@/features/*": ["src/features/*"],
+      "@/shared/*": ["src/shared/*"],
+      "@/assets/*": ["src/assets/*"],
+      "@theme": ["src/shared/theme"],
+      "@atoms": ["src/shared/ui/atoms"],
+      "@molecules": ["src/shared/ui"],
+      "@organisms": ["src/shared/ui"],
+      "@hooks": ["src/shared/hooks"],
+      "@utils/*": ["src/shared/utils/*"]
     }
   },
-  "exclude": ["supabase"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.d.ts"
+  ],
+  "exclude": ["supabase", "node_modules"],
+  "extends": "expo/tsconfig.base",
 }

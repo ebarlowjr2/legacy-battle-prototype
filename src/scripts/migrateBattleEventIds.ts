@@ -1,8 +1,8 @@
 // Migration script to convert legacy provider event IDs to canonical UUIDs
 // Run this once to update existing battles that have old TheSportsDB event IDs
 
-import { supabase } from '../shared/lib/supabaseClient';
-import { SportsRepo } from '../modules/sports/services/sportsRepo';
+import { supabase } from '@/shared/lib/supabaseClient';
+import { SportsRepo } from '@/features/sports';
 
 // Check if a string is a UUID
 function isUuid(s: string): boolean {

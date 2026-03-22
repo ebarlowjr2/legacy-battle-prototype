@@ -1,4 +1,2 @@
-export { colors, spacing, radii, fontSizes, lineHeights, shadows, zIndex } from './tokens';
-export { theme } from './theme';
-export type { Theme } from './theme';
-export { useTheme } from './useTheme';
+/** Re-exports the canonical theme barrel from `src/shared/constants/theme.ts`. */
+export * from '../constants/theme';
